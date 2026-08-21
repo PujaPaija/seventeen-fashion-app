@@ -18,23 +18,23 @@ export default async function Home() {
     .order('stage_name', { ascending: true });
 
   const { data: entries } = await supabase
-    .from('fashion_entries')
-    .select(`
-      id,
-      title,
-      event_type,
-      event_date,
-      location,
-      remarks,
-      entry_images (
-        image_url,
-        caption
-      ),
-      entry_members (
-        member_id
-      )
-    `)
-    .order('event_date', { ascending: false });
+  .from('fashion_entries')
+  .select(`
+    id,
+    title,
+    event_type,
+    event_date,
+    location,
+    remarks,
+    entry_images (
+      image_url,
+      caption
+    ),
+    entry_members (
+      member_id
+    )
+  `)
+  .order('event_date', { ascending: false });
 
   return (
     <main className="min-h-screen bg-neutral-950 text-neutral-100 p-6 md:p-12 font-sans">
@@ -56,12 +56,9 @@ export default async function Home() {
           <h2 className="text-2xl font-bold tracking-tight text-white">
             Latest Fashion Remarks
           </h2>
-          <Link href="/admin" className="text-xs bg-rose-500 hover:bg-rose-600 px-3 py-1.5 rounded-lg text-white font-medium transition">
-            + Add New Entry
-          </Link>
         </div>
 
-        <EntryFeed initialEntries={entries || []} members={members || []} />
+        <EntryFeed initialEntries={entries || []} members={members || []} isAdmin={false} />
       </section>
 
       {/* Members Roster (Clickable Cards) */}

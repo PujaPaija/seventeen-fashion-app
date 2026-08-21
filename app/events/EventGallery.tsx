@@ -9,23 +9,27 @@ interface ImageItem {
   image_url: string;
 }
 
+interface EventGalleryProps {
+  entryId: string;
+  initialImages: ImageItem[];
+  isAdmin?: boolean;
+}
+
 export default function EventGallery({
   entryId,
   initialImages,
-}: {
-  entryId: string;
-  initialImages: ImageItem[];
-}) {
+  isAdmin = false,
+}: EventGalleryProps) {
   const router = useRouter();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isZoomed, setIsZoomed] = useState(false);
   const [imageUrlsText, setImageUrlsText] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
 
- // 1. Delete single gallery photo handler
+  // Delete single photo handler
   const handleDeletePhoto = async (e: React.MouseEvent, imageId: string) => {
-    e.stopPropagation(); // Prevents opening the full-screen modal
-
+    e.stopPropagation();
     if (!confirm('Delete this image from gallery?')) return;
 
     const { error } = await supabase
@@ -36,13 +40,12 @@ export default function EventGallery({
     if (error) {
       alert('Error deleting image: ' + error.message);
     } else {
-      // Force page data refresh and reload state
       router.refresh();
-      window.location.reload(); 
+      window.location.reload();
     }
   };
 
-  // 2. Bulk add photos handler
+  // Bulk add photo links handler
   const handleAddPhotos = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!imageUrlsText.trim()) return;
@@ -74,17 +77,35 @@ export default function EventGallery({
     }
   };
 
+  const handleOpenModal = (url: string) => {
+    setSelectedImage(url);
+    setIsZoomed(false);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedImage(null);
+    setIsZoomed(false);
+  };
+
+  const toggleZoom = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsZoomed((prev) => !prev);
+  };
+
   return (
     <div>
       {/* Section Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold text-white">Media Gallery</h2>
-        <button
-          onClick={() => setShowUploadModal(true)}
-          className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white transition"
-        >
-          + Add Multiple Photos
-        </button>
+
+        {isAdmin && (
+          <button
+            onClick={() => setShowUploadModal(true)}
+            className="text-xs font-semibold px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white transition shadow-md shadow-rose-600/20 active:scale-95 cursor-pointer"
+          >
+            + Add Multiple Photos
+          </button>
+        )}
       </div>
 
       {/* Grid of Images */}
@@ -93,17 +114,18 @@ export default function EventGallery({
           {initialImages.map((img) => (
             <div
               key={img.id}
-              onClick={() => setSelectedImage(img.image_url)}
+              onClick={() => handleOpenModal(img.image_url)}
               className="relative aspect-square rounded-2xl overflow-hidden bg-neutral-900 border border-neutral-800 cursor-pointer group"
             >
-              {/* Delete button on top-right corner of each picture */}
-              <button
-                onClick={(e) => handleDeletePhoto(e, img.id)}
-                title="Delete Photo"
-                className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 bg-black/70 hover:bg-rose-600 text-white text-xs w-7 h-7 rounded-full flex items-center justify-center transition duration-200"
-              >
-                ✕
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={(e) => handleDeletePhoto(e, img.id)}
+                  title="Delete Photo"
+                  className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 bg-black/70 hover:bg-rose-600 text-white text-xs w-7 h-7 rounded-full flex items-center justify-center transition duration-200"
+                >
+                  ✕
+                </button>
+              )}
 
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -118,22 +140,29 @@ export default function EventGallery({
         <p className="text-neutral-500 text-sm">No additional photos found for this event.</p>
       )}
 
-      {/* LIGHTBOX MODAL */}
+      {/* LIGHTBOX MODAL WITH DOUBLE-CLICK / DOUBLE-TAP ZOOM */}
       {selectedImage && (
         <div
-          onClick={() => setSelectedImage(null)}
-          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 cursor-pointer"
+          onClick={handleCloseModal}
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 cursor-pointer select-none"
         >
-          <div className="relative max-w-5xl max-h-[90vh] w-full h-full flex items-center justify-center">
+          <div
+            className={`relative max-w-5xl max-h-[90vh] w-full h-full flex items-center justify-center overflow-auto transition-all ${
+              isZoomed ? 'cursor-zoom-out' : 'cursor-zoom-in'
+            }`}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={selectedImage}
               alt="Expanded view"
-              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+              onDoubleClick={toggleZoom}
+              className={`max-w-full max-h-full object-contain rounded-lg shadow-2xl transition-transform duration-300 ease-out ${
+                isZoomed ? 'scale-150 md:scale-[2]' : 'scale-100'
+              }`}
             />
             <button
-              onClick={() => setSelectedImage(null)}
-              className="absolute top-4 right-4 text-white text-xl bg-neutral-800/80 hover:bg-neutral-700 w-10 h-10 rounded-full flex items-center justify-center"
+              onClick={handleCloseModal}
+              className="fixed top-4 right-4 text-white text-xl bg-neutral-800/80 hover:bg-neutral-700 w-10 h-10 rounded-full flex items-center justify-center z-50"
             >
               ✕
             </button>
@@ -142,12 +171,12 @@ export default function EventGallery({
       )}
 
       {/* BULK UPLOAD MODAL */}
-      {showUploadModal && (
+      {showUploadModal && isAdmin && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
           <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-2xl w-full max-w-lg">
             <h3 className="text-lg font-bold text-white mb-2">Add Photo URLs (Bulk)</h3>
             <p className="text-xs text-neutral-400 mb-4">
-              Paste multiple image links below (put each URL on a new line).
+              Paste multiple image links below (separated by new lines or commas).
             </p>
 
             <form onSubmit={handleAddPhotos} className="space-y-4">
@@ -155,7 +184,7 @@ export default function EventGallery({
                 <textarea
                   rows={6}
                   required
-                  placeholder={`https://images.com/photo1.jpg\nhttps://images.com/photo2.jpg\nhttps://images.com/photo3.jpg`}
+                  placeholder={`https://images.com/photo1.jpg\nhttps://images.com/photo2.jpg`}
                   value={imageUrlsText}
                   onChange={(e) => setImageUrlsText(e.target.value)}
                   className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-rose-500 font-mono resize-none"

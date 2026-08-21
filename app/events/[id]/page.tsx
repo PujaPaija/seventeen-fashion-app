@@ -6,11 +6,10 @@ import EventGallery from '../EventGallery';
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ isAdmin?: string }>;
 }
 
-// Map of popular fashion brands to their official websites
 const OFFICIAL_BRAND_SITES: Record<string, string> = {
-  // Luxury Houses
   Dior: 'https://www.dior.com',
   Chanel: 'https://www.chanel.com',
   Celine: 'https://www.celine.com',
@@ -32,20 +31,15 @@ const OFFICIAL_BRAND_SITES: Record<string, string> = {
   Versace: 'https://www.versace.com',
   Valentino: 'https://www.valentino.com',
   Moncler: 'https://www.moncler.com',
-  
-  // Contemporary & Streetwear
   Supreme: 'https://www.supreme.com',
   'Off-White': 'https://www.off---white.com',
   OffWhite: 'https://www.off---white.com',
   Jacquemus: 'https://www.jacquemus.com',
   'Acne Studios': 'https://www.acnestudios.com',
   'Fear of God': 'https://fearofgod.com',
-  'Aprese Un': 'https://www.google.com/search?q=Aprese+Un+brand',
   Stussy: 'https://www.stussy.com',
   'Gentle Monster': 'https://www.gentlemonster.com',
   Marni: 'https://www.marni.com',
-  
-  // Sportswear & Denim
   Nike: 'https://www.nike.com',
   Adidas: 'https://www.adidas.com',
   Puma: 'https://www.puma.com',
@@ -55,31 +49,23 @@ const OFFICIAL_BRAND_SITES: Record<string, string> = {
   "Levi's": 'https://www.levi.com',
 };
 
-// Returns the direct official URL or defaults to a Google search for unmapped brands
 const getBrandUrl = (brandName: string) => {
   const trimmed = brandName.trim();
-  
-  // Direct match check
-  if (OFFICIAL_BRAND_SITES[trimmed]) {
-    return OFFICIAL_BRAND_SITES[trimmed];
-  }
+  if (OFFICIAL_BRAND_SITES[trimmed]) return OFFICIAL_BRAND_SITES[trimmed];
 
-  // Case-insensitive fallback check
   const matchedKey = Object.keys(OFFICIAL_BRAND_SITES).find(
     (key) => key.toLowerCase() === trimmed.toLowerCase()
   );
-  if (matchedKey) {
-    return OFFICIAL_BRAND_SITES[matchedKey];
-  }
+  if (matchedKey) return OFFICIAL_BRAND_SITES[matchedKey];
 
-  // Google Search fallback
   return `https://www.google.com/search?q=${encodeURIComponent(trimmed + ' official site')}`;
 };
 
-export default async function EventDetailPage({ params }: PageProps) {
+export default async function EventDetailPage({ params, searchParams }: PageProps) {
   const { id } = await params;
+  const sParams = await searchParams;
+  const isAdmin = sParams?.isAdmin === 'true';
 
-  // 1. Fetch main entry + linked member via junction table
   const { data: entry, error: entryError } = await supabase
     .from('fashion_entries')
     .select(`
@@ -91,13 +77,11 @@ export default async function EventDetailPage({ params }: PageProps) {
     .eq('id', id)
     .single();
 
-  // 2. Fetch all linked gallery images
   const { data: images } = await supabase
     .from('entry_images')
     .select('*')
     .eq('entry_id', id);
 
-  // 3. Fallback check for direct member_id column if junction table is empty
   let member = entry?.entry_members?.[0]?.members || null;
   if (!member && entry?.member_id) {
     const { data: directMember } = await supabase
@@ -114,8 +98,11 @@ export default async function EventDetailPage({ params }: PageProps) {
         <div className="max-w-md text-center">
           <h1 className="text-2xl font-bold mb-2">Event Not Found</h1>
           <p className="text-neutral-500 text-sm mb-6">Unable to load details for ID: {id}</p>
-          <Link href="/" className="text-rose-400 hover:underline text-sm font-medium">
-            ← Back to Feed
+          <Link
+            href={isAdmin ? '/admin?isAdmin=true' : '/'}
+            className="text-rose-400 hover:underline text-sm font-medium"
+          >
+            ← Back to {isAdmin ? 'Admin Dashboard' : 'Feed'}
           </Link>
         </div>
       </div>
@@ -127,15 +114,20 @@ export default async function EventDetailPage({ params }: PageProps) {
       <main className="max-w-4xl mx-auto px-4 py-12">
         {/* Top Nav */}
         <div className="flex items-center justify-between mb-8">
-          <Link href="/" className="text-sm font-medium text-neutral-400 hover:text-white transition">
-            ← Back to Latest Remarks
+          <Link
+            href={isAdmin ? '/admin?isAdmin=true' : '/'}
+            className="text-sm font-medium text-neutral-400 hover:text-white transition"
+          >
+            ← Back to {isAdmin ? 'Admin Dashboard' : 'Latest Remarks'}
           </Link>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-3">
-            <EditEventModal entry={entry} currentMemberId={member?.id} />
-            <DeleteEntryButton entryId={entry.id} />
-          </div>
+          {/* Conditional Admin Action Controls */}
+          {isAdmin && (
+            <div className="flex items-center gap-3">
+              <EditEventModal entry={entry} currentMemberId={member?.id} />
+              <DeleteEntryButton entryId={entry.id} />
+            </div>
+          )}
         </div>
 
         {/* Title & Metadata */}
@@ -148,16 +140,13 @@ export default async function EventDetailPage({ params }: PageProps) {
           </div>
 
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">{entry.title}</h1>
-          
-          <div className="flex flex-wrap items-center gap-3 mt-4">
-            {entry.location && (
-              <p className="text-sm text-neutral-400">📍 {entry.location}</p>
-            )}
 
-            {/* Member Badge Tag */}
+          <div className="flex flex-wrap items-center gap-3 mt-4">
+            {entry.location && <p className="text-sm text-neutral-400">📍 {entry.location}</p>}
+
             {member && (
               <Link
-                href={`/members/${member.id}`}
+                href={`/members/${member.id}${isAdmin ? '?isAdmin=true' : ''}`}
                 className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-900 border border-neutral-800 hover:border-neutral-700 transition group"
               >
                 {member.profile_image_url && (
@@ -174,7 +163,6 @@ export default async function EventDetailPage({ params }: PageProps) {
               </Link>
             )}
 
-            {/* External Clickable Brand Tags */}
             {entry.brands && entry.brands.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5">
                 {entry.brands.map((brand: string, idx: number) => (
@@ -184,7 +172,6 @@ export default async function EventDetailPage({ params }: PageProps) {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-800 hover:border-rose-500/50 hover:text-rose-300 transition inline-flex items-center gap-1 cursor-pointer group/brand"
-                    title={`Visit official ${brand} website`}
                   >
                     🏷️ {brand}
                     <span className="text-[10px] opacity-50 group-hover/brand:opacity-100 transition-opacity">
@@ -205,7 +192,7 @@ export default async function EventDetailPage({ params }: PageProps) {
         )}
 
         {/* Media Gallery */}
-        <EventGallery entryId={entry.id} initialImages={images || []} />
+        <EventGallery entryId={entry.id} initialImages={images || []} isAdmin={isAdmin} />
       </main>
     </div>
   );

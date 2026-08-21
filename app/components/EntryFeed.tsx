@@ -24,6 +24,7 @@ interface FashionEntry {
 interface EntryFeedProps {
   initialEntries: FashionEntry[];
   members: Member[];
+  isAdmin?: boolean;
 }
 
 const EVENT_TYPES = [
@@ -38,7 +39,11 @@ const EVENT_TYPES = [
   'Runway Show',
 ];
 
-export default function EntryFeed({ initialEntries, members }: EntryFeedProps) {
+export default function EntryFeed({
+  initialEntries,
+  members,
+  isAdmin = false,
+}: EntryFeedProps) {
   const [selectedType, setSelectedType] = useState('All Types');
   const [selectedMemberId, setSelectedMemberId] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -138,11 +143,18 @@ export default function EntryFeed({ initialEntries, members }: EntryFeedProps) {
               key={entry.id}
               className="overflow-hidden relative border rounded-2xl transition-all duration-300 bg-neutral-900/90 border-neutral-800 hover:border-neutral-700 hover:shadow-2xl hover:shadow-rose-950/20 hover:-translate-y-1 group"
             >
-              <div className="absolute top-3 right-3 z-20">
-                <DeleteEntryButton entryId={entry.id} />
-              </div>
+              {/* Delete Button - Only renders if user is Admin */}
+              {isAdmin && (
+                <div className="absolute top-3 right-3 z-20">
+                  <DeleteEntryButton entryId={entry.id} />
+                </div>
+              )}
 
-              <Link href={`/events/${entry.id}`} className="block">
+              {/* Passes ?isAdmin=true when navigated from Admin Dashboard */}
+              <Link
+                href={isAdmin ? `/events/${entry.id}?isAdmin=true` : `/events/${entry.id}`}
+                className="block"
+              >
                 {entry.entry_images && entry.entry_images.length > 0 && (
                   <div className="overflow-hidden relative w-full h-64 bg-neutral-800">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -151,7 +163,8 @@ export default function EntryFeed({ initialEntries, members }: EntryFeedProps) {
                       alt={entry.title}
                       className="object-cover w-full h-full transition duration-500 ease-out group-hover:scale-105"
                     />
-                    <div className="absolute inset-0 bg-gradient border-0 bg-[linear-gradient(to_top,rgba(23,23,23,0.6),transparent)] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />                  </div>
+                    <div className="absolute inset-0 bg-gradient border-0 bg-[linear-gradient(to_top,rgba(23,23,23,0.6),transparent)] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                  </div>
                 )}
 
                 <div className="p-6">
@@ -179,7 +192,7 @@ export default function EntryFeed({ initialEntries, members }: EntryFeedProps) {
                     <div className="flex flex-wrap gap-1.5 mb-3">
                       {entry.brands.map((brand, i) => (
                         <span
-                          key={i}
+                          key={`${brand}-${i}`}
                           className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-neutral-800/90 text-neutral-300 border border-neutral-700/60 hover:border-rose-500/40 hover:text-rose-300 transition-all duration-150 inline-flex items-center gap-1"
                         >
                           🏷️ {brand}

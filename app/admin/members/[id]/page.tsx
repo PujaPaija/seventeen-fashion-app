@@ -1,227 +1,213 @@
-'use client';
-
-import { useState, useEffect } from 'react';
-import { supabase } from '../../../lib/supabase';
+import { supabase } from '@/app/lib/supabase';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import DeleteEntryButton from '@/app/components/DeleteEntryButton';
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
 
-export default function EditMemberAdminPage() {
-  const params = useParams();
-  const router = useRouter();
-  const id = params?.id as string;
+export default async function AdminMemberPage({ params }: PageProps) {
+  const { id } = await params;
 
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  // 1. Fetch Member Profile Details
+  const { data: member } = await supabase
+    .from('members')
+    .select('*')
+    .eq('id', id)
+    .single();
 
-  // Member Fields
-  const [stageName, setStageName] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [position, setPosition] = useState('');
-  const [profileImageUrl, setProfileImageUrl] = useState('');
-  const [bio, setBio] = useState('');
-  const [dateOfBirth, setDateOfBirth] = useState('');
-  const [instagramHandle, setInstagramHandle] = useState('');
+  // 2. Fetch Tagged Fashion Entries
+  const { data: memberEntries } = await supabase
+    .from('entry_members')
+    .select(`
+      fashion_entries (
+        *,
+        entry_images (*)
+      )
+    `)
+    .eq('member_id', id);
 
-  // Brand Endorsement Fields
-  const [brands, setBrands] = useState<any[]>([]);
-  const [newBrandName, setNewBrandName] = useState('');
-  const [newPartnershipType, setNewPartnershipType] = useState('Global Ambassador');
+  const entries = memberEntries?.map((item) => item.fashion_entries).filter(Boolean) || [];
 
-  // Load existing member details when page loads
-  useEffect(() => {
-    if (!id) return;
-
-    async function loadData() {
-      const { data: member } = await supabase
-        .from('members')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (member) {
-        setStageName(member.stage_name || '');
-        setFullName(member.full_name || '');
-        setPosition(member.position || '');
-        setProfileImageUrl(member.profile_image_url || '');
-        setBio(member.bio || '');
-        setDateOfBirth(member.date_of_birth || '');
-        setInstagramHandle(member.instagram_handle || '');
-      }
-
-      const { data: brandData } = await supabase
-        .from('member_brand_ambassadors')
-        .select('*')
-        .eq('member_id', id);
-
-      if (brandData) setBrands(brandData);
-    }
-
-    loadData();
-  }, [id]);
-
-  // Handle Profile Update
-  const handleUpdateProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage('');
-
-    const { error } = await supabase
-      .from('members')
-      .update({
-        position,
-        profile_image_url: profileImageUrl,
-        bio,
-        date_of_birth: dateOfBirth || null,
-        instagram_handle: instagramHandle,
-      })
-      .eq('id', id);
-
-    setLoading(false);
-    if (error) {
-      setMessage(`❌ Error updating profile: ${error.message}`);
-    } else {
-      setMessage('✨ Profile updated successfully!');
-      router.refresh();
-    }
-  };
-
-  // Add Brand Endorsement
-  const handleAddBrand = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newBrandName) return;
-
-    const { data } = await supabase
-      .from('member_brand_ambassadors')
-      .insert([{ member_id: id, brand_name: newBrandName, partnership_type: newPartnershipType }])
-      .select()
-      .single();
-
-    if (data) {
-      setBrands([...brands, data]);
-      setNewBrandName('');
-      router.refresh();
-    }
-  };
-
-  return (
-    <main className="min-h-screen bg-neutral-950 text-neutral-100 p-6 md:p-12 font-sans">
-      <div className="max-w-2xl mx-auto">
-        <Link href={`/members/${id}`} className="text-xs text-rose-400 hover:underline mb-6 inline-block">
-          ← View {stageName || 'Member'}'s Profile
-        </Link>
-
-        <h1 className="text-3xl font-black text-white mb-2">Edit Profile: {stageName || 'Loading...'}</h1>
-        <p className="text-neutral-400 text-sm mb-8">{fullName}</p>
-
-        {message && (
-          <div className="p-4 rounded-xl mb-6 text-sm font-medium bg-rose-500/10 border border-rose-500/20 text-rose-400">
-            {message}
-          </div>
-        )}
-
-        <form onSubmit={handleUpdateProfile} className="space-y-6 bg-neutral-900 border border-neutral-800 p-6 rounded-2xl mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold uppercase text-neutral-400 mb-2">Date of Birth</label>
-              <input
-                type="date"
-                value={dateOfBirth}
-                onChange={(e) => setDateOfBirth(e.target.value)}
-                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-rose-400 text-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold uppercase text-neutral-400 mb-2">Instagram Handle</label>
-              <input
-                type="text"
-                placeholder="e.g. feat.dino"
-                value={instagramHandle}
-                onChange={(e) => setInstagramHandle(e.target.value)}
-                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-rose-400 text-white"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold uppercase text-neutral-400 mb-2">Position / Role</label>
-            <input
-              type="text"
-              placeholder="e.g. Lead Rapper, Visual"
-              value={position}
-              onChange={(e) => setPosition(e.target.value)}
-              className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-rose-400 text-white"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold uppercase text-neutral-400 mb-2">Profile Image URL</label>
-            <input
-              type="url"
-              placeholder="https://..."
-              value={profileImageUrl}
-              onChange={(e) => setProfileImageUrl(e.target.value)}
-              className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-rose-400 text-white"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold uppercase text-neutral-400 mb-2">Biography</label>
-            <textarea
-              rows={4}
-              placeholder="Fashion profile summary..."
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-rose-400 text-white"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-rose-500 hover:bg-rose-600 font-bold py-3 rounded-xl transition text-white"
-          >
-            {loading ? 'Saving...' : 'Update Profile Info'}
-          </button>
-        </form>
-
-        {/* Brand Ambassador Section */}
-        <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-2xl">
-          <h2 className="text-lg font-bold text-white mb-4">Brand Ambassadorships</h2>
-
-          <div className="space-y-2 mb-6">
-            {brands.map((b) => (
-              <div key={b.id} className="flex justify-between items-center bg-neutral-950 p-3 rounded-xl text-sm border border-neutral-800">
-                <span className="font-bold text-white">{b.brand_name}</span>
-                <span className="text-xs text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded">{b.partnership_type}</span>
-              </div>
-            ))}
-          </div>
-
-          <form onSubmit={handleAddBrand} className="flex gap-2">
-            <input
-              type="text"
-              placeholder="Brand Name (e.g. Dior)"
-              value={newBrandName}
-              onChange={(e) => setNewBrandName(e.target.value)}
-              className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-rose-400 text-white"
-            />
-            <select
-              value={newPartnershipType}
-              onChange={(e) => setNewPartnershipType(e.target.value)}
-              className="bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-rose-400 text-white"
-            >
-              <option value="Global Ambassador">Global Ambassador</option>
-              <option value="Local Ambassador">Local Ambassador</option>
-              <option value="Brand Collab">Brand Collab</option>
-              <option value="Friend of House">Friend of House</option>
-            </select>
-            <button type="submit" className="bg-neutral-800 hover:bg-neutral-700 text-rose-400 font-bold px-4 py-2 rounded-xl text-sm">
-              + Add
-            </button>
-          </form>
+  if (!member) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
+        <div className="text-center space-y-3">
+          <h1 className="text-xl font-bold">Member Not Found</h1>
+          <Link href="/admin" className="text-rose-500 hover:text-rose-400 text-xs font-semibold">
+            ← Back to All Members
+          </Link>
         </div>
       </div>
-    </main>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-black text-white p-6 md:p-10 font-sans">
+      <main className="max-w-6xl mx-auto space-y-8">
+        
+        {/* Navigation Link & Edit Action */}
+        <div className="flex items-center justify-between">
+          <Link
+            href="/admin"
+            className="text-rose-500 hover:text-rose-400 text-xs font-semibold tracking-wide transition"
+          >
+            ← Back to All Members
+          </Link>
+
+          <Link
+            href={`/admin/edit-member/${member.id}`}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-rose-400 text-xs font-medium transition shadow-md"
+          >
+            ✏️ Edit Profile (Admin)
+          </Link>
+        </div>
+
+        {/* Member Profile Main Banner Card */}
+        <section className="bg-neutral-900/60 border border-neutral-800 rounded-3xl p-8 backdrop-blur-md">
+          <div className="flex flex-col md:flex-row items-start gap-8">
+            
+            {/* Profile Avatar */}
+            <div className="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden border-2 border-rose-500/30 shrink-0 bg-neutral-800">
+              {member.profile_image_url ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={member.profile_image_url}
+                  alt={member.stage_name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-3xl font-bold text-neutral-600">
+                  {member.stage_name[0]}
+                </div>
+              )}
+            </div>
+
+            {/* Profile Info Details */}
+            <div className="space-y-4 flex-1">
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white">
+                  {member.stage_name}
+                </h1>
+                {member.sub_unit && (
+                  <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/20 uppercase tracking-wider">
+                    {member.sub_unit}
+                  </span>
+                )}
+              </div>
+
+              {/* Name & Positions */}
+              <p className="text-sm text-neutral-400 font-medium">
+                {member.full_name} {member.positions ? `• ${member.positions}` : ''}
+              </p>
+
+              {/* Birthdate & Instagram */}
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                {member.birthdate && (
+                  <span className="text-xs font-medium px-3 py-1.5 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-300 flex items-center gap-1.5">
+                    🎂 {member.birthdate}
+                  </span>
+                )}
+                {member.instagram_handle && (
+                  <a
+                    href={`https://instagram.com/${member.instagram_handle.replace('@', '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-medium px-3 py-1.5 rounded-xl bg-neutral-950 border border-neutral-800 text-rose-400 hover:border-rose-500/40 transition flex items-center gap-1.5"
+                  >
+                    📸 @{member.instagram_handle.replace('@', '')}
+                  </a>
+                )}
+              </div>
+
+              {/* Bio Summary */}
+              {member.bio && (
+                <p className="text-sm text-neutral-300 leading-relaxed pt-2">
+                  {member.bio}
+                </p>
+              )}
+
+              {/* Brand Ambassadorships */}
+              {member.brands && Array.isArray(member.brands) && (
+                <div className="pt-4 border-t border-neutral-800/80 space-y-2">
+                  <h4 className="text-[10px] font-bold tracking-wider uppercase text-neutral-500">
+                    BRAND AMBASSADORSHIPS & COLLABORATIONS
+                  </h4>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {member.brands.map((b: any, index: number) => (
+                      <div key={index} className="inline-flex items-center gap-2 bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-1 text-xs">
+                        <span className="font-bold text-white">{b.name}</span>
+                        {b.role && (
+                          <span className="text-[10px] text-rose-400 font-medium">{b.role}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+          </div>
+        </section>
+
+        {/* Fashion Feed Grid */}
+        <section className="space-y-6">
+          <h2 className="text-2xl font-bold text-white tracking-tight">
+            {member.stage_name}&apos;s Fashion Feed
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {entries.map((entry: any) => (
+              <article
+                key={entry.id}
+                className="group relative bg-neutral-900/80 border border-neutral-800/80 rounded-2xl overflow-hidden shadow-lg hover:border-neutral-700 hover:-translate-y-1 transition duration-300"
+              >
+                {/* Delete Button Overlay */}
+                <div className="absolute top-3 right-3 z-10">
+                  <DeleteEntryButton entryId={entry.id} />
+                </div>
+
+                <Link href={`/events/${entry.id}?isAdmin=true`} className="block">
+                  {/* Cover Image */}
+                  {entry.entry_images?.[0] && (
+                    <div className="relative h-72 w-full bg-neutral-950 overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={entry.entry_images[0].image_url}
+                        alt={entry.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                      />
+                    </div>
+                  )}
+
+                  {/* Card Content */}
+                  <div className="p-5 space-y-2">
+                    <div>
+                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20 uppercase tracking-wider">
+                        {entry.event_type}
+                      </span>
+                    </div>
+
+                    <h3 className="text-lg font-bold text-white tracking-tight leading-snug group-hover:text-rose-400 transition-colors pr-8">
+                      {entry.title}
+                    </h3>
+
+                    <p className="text-xs text-neutral-500 font-medium pt-1">
+                      {entry.event_date} {entry.location ? `• ${entry.location}` : ''}
+                    </p>
+
+                    {entry.description && (
+                      <p className="text-xs text-neutral-400 italic leading-relaxed line-clamp-2 pt-1">
+                        &quot;{entry.description}&quot;
+                      </p>
+                    )}
+                  </div>
+                </Link>
+              </article>
+            ))}
+          </div>
+        </section>
+
+      </main>
+    </div>
   );
 }
